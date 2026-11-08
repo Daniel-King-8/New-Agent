@@ -31,6 +31,10 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
     const joined = (body.messages || []).map((message) => message.content || '').join('\n');
+    if (joined.includes('用户需求：你好')) {
+      jsonReply(res, JSON.stringify({ mode: 'chat', reply: '你好，我是主管。' }));
+      return;
+    }
     if (joined.includes('只输出 JSON') || (joined.includes('JSON 结构') && joined.includes('tasks'))) {
       jsonReply(res, JSON.stringify({
         goal: '测试目标',
@@ -122,6 +126,22 @@ test('native orchestrator plans, executes dependencies, verifies and reports', a
   assert.equal(result.tasks[0].text.includes('员工产出'), true);
   assert.equal(result.verification.pass, true);
   assert.match(result.reply, /最终结果/);
+});
+
+test('simple greeting bypasses the task DAG and answers directly', async () => {
+  const logger = { info() {}, warn() {}, error() {} };
+  const result = await runOrchestration({
+    text: '你好',
+    history: [],
+    runDir: path.join(dataDir, 'run-chat'),
+    logger,
+    onEvent: () => {}
+  });
+
+  assert.equal(result.plan.mode, 'chat');
+  assert.equal(result.tasks.length, 0);
+  assert.match(result.reply, /你好/);
+  assert.equal(result.files.length, 0);
 });
 
 test.after(() => {

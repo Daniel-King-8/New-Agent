@@ -67,12 +67,37 @@ function upstreamText(upstreamResults) {
   ].join('\n')).join('\n\n');
 }
 
+async function directChat({ captain, text, history }) {
+  const messages = [{
+    role: 'system',
+    content: [
+      '你是多 Agent 团队的主管。',
+      '用自然、直接、具体的方式回答用户，不要输出 JSON，不要提内部编排细节。',
+      '如果用户问你是谁、让你介绍团队，就根据下面的团队信息如实回答，不要用 [占位符]。',
+      '',
+      '当前团队：',
+      teamForPrompt()
+    ].join('\n')
+  }];
+  for (const item of (history || []).slice(-12)) {
+    if (item.role === 'user' || item.role === 'assistant') messages.push({ role: item.role, content: item.content });
+  }
+  messages.push({ role: 'user', content: text });
+  const result = await chat(captain, { messages, temperature: 0.6, maxTokens: 3000, timeoutMs: 120000 });
+  return result.text?.trim() || '我在。';
+}
+
 async function planTask({ captain, text, history }) {
   const cfg = getConfig();
   const system = [
-    '你是多 Agent 团队的主管。根据用户需求拆解任务，只输出 JSON，不要输出任何解释。',
-    'JSON 结构：',
-    '{"goal":"一句话目标","tasks":[{"id":"t1","title":"任务名","instruction":"详细指令","kind":"llm|code|image|tts","requiredTags":["标签"],"dependsOn":[],"deliverable":"交付物","acceptance":"验收标准"}]}',
+    '你是多 Agent 团队的主管。先判断用户是在闲聊/简单问答，还是需要团队执行任务。只输出 JSON，不要输出任何解释。',
+    '',
+    '如果只是打招呼、闲聊、问你是谁、让你介绍团队、问一个简单问题，不需要派活，返回：',
+    '{"mode":"chat","reply":"给用户的自然回答"}',
+    '',
+    '如果需要执行任务（写代码、生图、配音、调研、整合交付物等），返回：',
+    '{"mode":"task","goal":"一句话目标","tasks":[{"id":"t1","title":"任务名","instruction":"详细指令","kind":"llm|code|image|tts","requiredTags":["标签"],"dependsOn":[],"deliverable":"交付物","acceptance":"验收标准"}]}',
+    '',
     '规则：',
     `- 最多 ${cfg.orchestration.maxTasks} 个任务。`,
     '- 能并行的任务不要互相依赖；有依赖必须写 dependsOn。',
@@ -93,15 +118,28 @@ async function planTask({ captain, text, history }) {
   try {
     plan = extractJson(result.text);
   } catch (error) {
-    throw new Error(`主管返回的计划不是有效 JSON：${error.message}\n${String(result.text).slice(0, 500)}`);
+    return { mode: 'chat', reply: '', parseError: error.message, raw: result.text };
   }
-  const tasks = (plan.tasks || []).map(normalizeTask).slice(0, cfg.orchestration.maxTasks);
-  if (!tasks.length) throw new Error('主管没有拆出任何任务');
+  if (plan.mode === 'chat') {
+    return { mode: 'chat', reply: String(plan.reply || '').trim(), usage: result.usage, raw: result.text };
+  }
+  const rawTasks = Array.isArray(plan.tasks) ? plan.tasks : [];
+  if (!rawTasks.length) {
+    return {
+      mode: 'chat',
+      reply: String(plan.reply || '').trim(),
+      usage: result.usage,
+      raw: result.text,
+      emptyPlan: true
+    };
+  }
+  const tasks = rawTasks.map(normalizeTask).slice(0, cfg.orchestration.maxTasks);
   const ids = new Set(tasks.map((task) => task.id));
   for (const task of tasks) {
     task.dependsOn = task.dependsOn.filter((dep) => ids.has(dep) && dep !== task.id);
   }
   return {
+    mode: 'task',
     goal: String(plan.goal || text),
     tasks,
     usage: result.usage,
@@ -109,14 +147,21 @@ async function planTask({ captain, text, history }) {
   };
 }
 
-async function runTask({ task, agent, upstream, runDir }) {
+async function runTask({ task, agent, upstream, runDir, goal, userText, team }) {
   const started = Date.now();
   const system = [
     agent.systemPrompt || `你是团队里的${agent.kind}员工。`,
     '',
+    `用户原始需求：${userText || '（未提供）'}`,
+    `总目标：${goal || '（未提供）'}`,
+    '',
+    '当前团队：',
+    team || teamForPrompt(),
+    '',
     `你的任务：${task.title}`,
     `交付物：${task.deliverable || '按任务要求产出'}`,
     `验收标准：${task.acceptance || '内容完整、可直接使用'}`,
+    '如果任务只是自我介绍或简单问答，直接给自然、具体的中文回答，不要使用 [占位符]。',
     '',
     '上游产物：',
     upstreamText(upstream)
@@ -183,7 +228,7 @@ async function runTask({ task, agent, upstream, runDir }) {
   };
 }
 
-async function runDag({ tasks, runDir, maxParallel, retryFailed, onEvent }) {
+async function runDag({ tasks, runDir, maxParallel, retryFailed, onEvent, goal, userText, team }) {
   const cfg = getConfig();
   const state = new Map(tasks.map((task) => [task.id, { task, status: 'pending', result: null, error: '', attempts: 0 }]));
   const results = [];
@@ -211,7 +256,7 @@ async function runDag({ tasks, runDir, maxParallel, retryFailed, onEvent }) {
         item.attempts = attempt + 1;
         try {
           const agent = chooseAgent(item.task);
-          item.result = await runTask({ task: item.task, agent, upstream, runDir });
+          item.result = await runTask({ task: item.task, agent, upstream, runDir, goal, userText, team });
           item.status = 'done';
           item.error = '';
           results.push(item.result);
@@ -276,7 +321,7 @@ async function verifyResults({ captain, goal, taskStates }) {
   }
 }
 
-async function reportResults({ captain, goal, taskStates }) {
+async function reportResults({ captain, goal, taskStates, userText, team }) {
   const rows = taskStates.map((item) => ({
     taskId: item.task.id,
     title: item.task.title,
@@ -287,8 +332,11 @@ async function reportResults({ captain, goal, taskStates }) {
   }));
   const prompt = [
     '你是主管。请根据以下任务结果，给用户写一条最终回复。',
-    '要求：用用户的语言；简洁直接；只讲结果和必要说明；保留文件路径；不要提内部编排细节。',
+    '要求：用用户的语言；简洁直接；只讲结果和必要说明；保留文件路径；不要提内部编排细节；不要使用 [占位符]。',
+    `用户原始需求：${userText || '（未提供）'}`,
     `总目标：${goal}`,
+    '当前团队：',
+    team || teamForPrompt(),
     '任务结果：',
     JSON.stringify(rows, null, 2)
   ].join('\n');
@@ -323,14 +371,49 @@ export async function runOrchestration({ text, history = [], runDir, logger, onE
   if (!captain?.apiKey) throw new Error('主管未配置 API Key');
   fs.mkdirSync(runDir, { recursive: true });
 
-  logger?.info('主管开始拆解任务');
-  const plan = await planTask({ captain, text, history });
+  logger?.info('主管开始处理消息');
+  let plan;
+  try {
+    plan = await planTask({ captain, text, history });
+  } catch (error) {
+    logger?.warn(`主管拆解失败: ${error.message}`);
+    plan = { mode: 'chat', reply: '', planError: error.message };
+  }
   onEvent?.({ type: 'plan', plan });
-  logger?.info(`主管拆出 ${plan.tasks.length} 个任务`);
 
+  if (plan.mode === 'chat') {
+    let reply = plan.reply && plan.reply.trim();
+    if (!reply) {
+      try {
+        reply = await directChat({ captain, text, history });
+      } catch (error) {
+        throw new Error(plan.planError || error.message);
+      }
+    }
+    onEvent?.({ type: 'chat', reply });
+    return {
+      reply,
+      plan,
+      tasks: [],
+      verification: { pass: true, issues: [], summary: '直接对话' },
+      files: []
+    };
+  }
+
+  logger?.info(`主管拆出 ${plan.tasks.length} 个任务`);
+  const team = teamForPrompt();
   const maxParallel = cfg.orchestration.maxParallel || 3;
   const retryFailed = cfg.orchestration.retryFailed || 0;
-  const executed = await runDag({ tasks: plan.tasks, runDir, maxParallel, retryFailed, onEvent });
+  const executed = await runDag({
+    tasks: plan.tasks,
+    runDir,
+    maxParallel,
+    retryFailed,
+    onEvent,
+    goal: plan.goal,
+    userText: text,
+    team
+  });
 
   let verification = await verifyResults({ captain, goal: plan.goal, taskStates: executed.state });
   let taskStates = executed.state;
@@ -340,7 +423,16 @@ export async function runOrchestration({ text, history = [], runDir, logger, onE
     const retryIds = new Set(verification.issues.map((issue) => issue.taskId));
     const retryTasks = plan.tasks.filter((task) => retryIds.has(task.id));
     if (retryTasks.length) {
-      const retry = await runDag({ tasks: retryTasks, runDir, maxParallel: 1, retryFailed: 0, onEvent });
+      const retry = await runDag({
+        tasks: retryTasks,
+        runDir,
+        maxParallel: 1,
+        retryFailed: 0,
+        onEvent,
+        goal: plan.goal,
+        userText: text,
+        team
+      });
       const retryById = new Map(retry.results.map((result) => [result.taskId, result]));
       taskStates = taskStates.map((item) => {
         if (retryById.has(item.task.id)) {
@@ -352,7 +444,7 @@ export async function runOrchestration({ text, history = [], runDir, logger, onE
     }
   }
 
-  const reply = await reportResults({ captain, goal: plan.goal, taskStates });
+  const reply = await reportResults({ captain, goal: plan.goal, taskStates, userText: text, team });
   const files = [...new Set(taskStates.flatMap((item) => item.result?.files || []))];
   return {
     reply,
