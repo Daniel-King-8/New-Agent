@@ -1,0 +1,20 @@
+{
+  "name": "captain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Captain - a self-hosted multi-agent team orchestrator with QQ / Telegram / Feishu channels, Hermes engine and a native web console.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node app.mjs",
+    "dev": "node --watch app.mjs",
+    "test": "node --test test/unit.test.mjs test/integration.test.mjs",
+    "check": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.76.0",
+    "ws": "^8.22.2"
+  }
+}

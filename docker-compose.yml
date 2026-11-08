@@ -1,0 +1,113 @@
+name: captain
+
+x-common: &common
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  networks:
+    - captain
+
+services:
+  # Captain Node 控制台 + 通道层。始终启动。
+  captain:
+    <<: *common
+    build: .
+    image: captain:local
+    container_name: captain
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    ports:
+      - "${CAPTAIN_PORT:-8080}:8080"
+    volumes:
+      - "${DATA_DIR:-./data}:/data"
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+      CAPTAIN_DATA_DIR: /data
+      PORT: "8080"
+      HERMES_BASE_URL: "${HERMES_BASE_URL:-http://hermes:8642}"
+      HERMES_API_KEY: "${HERMES_API_KEY:-}"
+      HERMES_DASHBOARD_URL: "${HERMES_DASHBOARD_URL:-http://hermes:9119}"
+      HERMES_DASHBOARD_SESSION_TOKEN: "${HERMES_DASHBOARD_SESSION_TOKEN:-}"
+      NAPCAT_WS_URL: "${NAPCAT_WS_URL:-ws://napcat:3001}"
+      NAPCAT_ACCESS_TOKEN: "${NAPCAT_ACCESS_TOKEN:-}"
+      NAPCAT_WEBUI_URL: "${NAPCAT_WEBUI_URL:-http://napcat:6099}"
+      CAPTAIN_MASTER_KEY: "${CAPTAIN_MASTER_KEY:-}"
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 768m
+    cpus: 2
+
+  # Hermes Agent 引擎。可选：已有外部 Hermes 时不必启动，
+  # 只设置 HERMES_BASE_URL / HERMES_DASHBOARD_URL 指向它即可。
+  # 镜像入口因版本而异，必要时用 command 覆盖。
+  hermes:
+    <<: *common
+    image: "${HERMES_IMAGE:-nousresearch/hermes-agent:latest}"
+    container_name: hermes
+    profiles:
+      - hermes
+    user: "1000:1000"
+    read_only: false
+    volumes:
+      - "${HERMES_HOME:-./data/hermes}:/home/hermes/.hermes"
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+      HOME: /home/hermes
+      API_SERVER_ENABLED: "true"
+      API_SERVER_KEY: "${HERMES_API_KEY:-change-me}"
+      HERMES_DASHBOARD_SESSION_TOKEN: "${HERMES_DASHBOARD_SESSION_TOKEN:-change-me-at-least-32-characters}"
+    # 只走内网，不映射端口
+    expose:
+      - "8642"
+      - "9119"
+    mem_limit: 2g
+    cpus: 2
+
+  # QQ 协议端。可选：启用 QQ 时启动。
+  # 首次登录打开后台「通道 → QQ → 打开 NapCat 登录页」扫码。
+  napcat:
+    <<: *common
+    image: "${NAPCAT_IMAGE:-mlikiowa/napcat-docker:latest}"
+    container_name: napcat
+    profiles:
+      - qq
+    user: "0:0"
+    read_only: false
+    cap_drop: []
+    volumes:
+      - "${DATA_DIR:-./data}/napcat/config:/app/napcat/config"
+      - "${DATA_DIR:-./data}/napcat/QQ:/app/.config/QQ"
+      - "${DATA_DIR:-./data}/napcat/plugins:/app/napcat/plugins"
+      - "${DATA_DIR:-./data}/napcat/logs:/app/napcat/logs"
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+      HOME: /app
+      NAPCAT_UID: "1000"
+      NAPCAT_GID: "1000"
+      MODE: ws
+      WEBUI_TOKEN: "${NAPCAT_WEBUI_TOKEN:-change-me}"
+    ports:
+      # 仅本机回环，供 SSH 隧道兜底；后台默认通过 /napcat/ 代理访问。
+      - "127.0.0.1:${NAPCAT_WEBUI_PORT:-6099}:6099"
+    expose:
+      - "3001"
+      - "6099"
+    mem_limit: 768m
+    cpus: 2
+
+networks:
+  captain:
+    driver: bridge

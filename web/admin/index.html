@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Captain · 队长控制台</title>
+<style>
+:root{
+  --bg:#0b1020;--bg2:#101a33;--panel:#131d36;--panel2:#182444;--line:#26345a;
+  --text:#e8eefc;--muted:#93a4c8;--accent:#6ea8fe;--accent2:#8b5cf6;
+  --ok:#34d399;--warn:#fbbf24;--bad:#f87171;--radius:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(1200px 800px at 15% -10%,#1b2b5a 0%,transparent 55%),radial-gradient(900px 700px at 110% 10%,#2a1b5a 0%,transparent 50%),var(--bg);color:var(--text);font:14px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+button,input,select,textarea{font:inherit}
+a{color:var(--accent)}
+.hidden{display:none!important}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{width:min(420px,100%);background:linear-gradient(180deg,rgba(24,36,68,.96),rgba(16,26,51,.96));border:1px solid var(--line);border-radius:20px;padding:34px;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.logo{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.logo-mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:22px}
+.logo h1{font-size:22px;margin:0;letter-spacing:.5px}
+.logo p{margin:0;color:var(--muted);font-size:12px}
+.login-card h2{font-size:18px;margin:24px 0 6px}
+.login-card .sub{color:var(--muted);margin:0 0 22px;font-size:13px}
+.field{margin-bottom:14px}
+.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;background:#0c1428;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;outline:none;transition:.15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(110,168,254,.15)}
+.field textarea{min-height:88px;resize:vertical}
+.field .hint{color:var(--muted);font-size:11px;margin-top:4px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid transparent;border-radius:10px;padding:9px 14px;cursor:pointer;background:var(--panel2);color:var(--text);transition:.15s}
+.btn:hover{border-color:var(--line);background:#1e2d55}
+.btn.primary{background:linear-gradient(135deg,var(--accent),#4f8ff7);color:#06122b;font-weight:650}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.danger{background:rgba(248,113,113,.12);color:#ffb4b4;border-color:rgba(248,113,113,.35)}
+.btn.ghost{background:transparent;border-color:var(--line)}
+.btn.small{padding:6px 10px;font-size:12px;border-radius:8px}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:228px;flex:0 0 228px;background:rgba(12,19,38,.85);border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(14px);position:sticky;top:0;height:100vh}
+.sidebar .brand{padding:0 8px 18px}
+.sidebar .brand b{font-size:17px;letter-spacing:.5px}
+.sidebar .brand span{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:0;color:var(--muted);padding:10px 12px;border-radius:10px;cursor:pointer;text-align:left;transition:.15s}
+.nav button:hover{background:rgba(110,168,254,.08);color:var(--text)}
+.nav button.active{background:linear-gradient(90deg,rgba(110,168,254,.18),rgba(139,92,246,.12));color:#fff;box-shadow:inset 0 0 0 1px rgba(110,168,254,.22)}
+.nav .ico{width:20px;text-align:center;opacity:.9}
+.sidebar .foot{margin-top:auto;color:var(--muted);font-size:11px;padding:10px 8px}
+.main{flex:1;min-width:0;padding:24px 28px 60px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+.topbar h2{margin:0;font-size:20px}
+.topbar .sub{color:var(--muted);font-size:12px;margin-top:3px}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px;background:rgba(19,29,54,.7)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--ok);box-shadow:0 0 10px rgba(52,211,153,.6)}
+.dot.bad{background:var(--bad);box-shadow:0 0 10px rgba(248,113,113,.6)}
+.dot.warn{background:var(--warn)}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{grid-column:span 4;background:linear-gradient(180deg,rgba(24,36,68,.9),rgba(16,26,51,.9));border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.card.wide{grid-column:span 8}
+.card.full{grid-column:span 12}
+.card h3{margin:0 0 4px;font-size:14px}
+.card .muted{color:var(--muted);font-size:12px}
+.kpi{font-size:30px;font-weight:700;letter-spacing:-.5px;margin:8px 0 0}
+.kpi small{font-size:12px;color:var(--muted);font-weight:500;margin-left:6px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spread{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.section{background:rgba(16,26,51,.72);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+.section h3{margin:0 0 14px;font-size:15px;display:flex;align-items:center;gap:8px}
+.section .desc{color:var(--muted);font-size:12px;margin:-8px 0 14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:11px 10px;border-bottom:1px solid rgba(38,52,90,.65);vertical-align:top;font-size:13px}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+tr:last-child td{border-bottom:0}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:11px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.badge.ok{color:#b9ffdf;border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.1)}
+.badge.warn{color:#ffe6a6;border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.1)}
+.badge.bad{color:#ffc4c4;border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.1)}
+.badge.blue{color:#cfe0ff;border-color:rgba(110,168,254,.35);background:rgba(110,168,254,.1)}
+.tag{display:inline-block;padding:2px 7px;margin:2px 3px 2px 0;border-radius:6px;background:rgba(139,92,246,.14);border:1px solid rgba(139,92,246,.3);color:#d9c9ff;font-size:11px}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.empty{color:var(--muted);text-align:center;padding:26px;font-size:13px}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tabs button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:7px 14px;cursor:pointer}
+.tabs button.active{background:rgba(110,168,254,.14);border-color:rgba(110,168,254,.4);color:#fff}
+.whitelist{min-height:100px}
+.run-row{cursor:pointer}
+.run-row:hover td{background:rgba(110,168,254,.05)}
+.pre{white-space:pre-wrap;word-break:break-word;background:#0a1122;border:1px solid var(--line);border-radius:10px;padding:12px;max-height:420px;overflow:auto;font:12px/1.55 ui-monospace,Consolas,monospace;color:#c7d4ef}
+.chat-box{height:calc(100vh - 250px);min-height:380px;display:flex;flex-direction:column;background:#0a1122;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.chat-log{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:78%;padding:10px 13px;border-radius:12px;white-space:pre-wrap;word-break:break-word;font-size:13px}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,rgba(110,168,254,.22),rgba(79,143,247,.18));border:1px solid rgba(110,168,254,.3)}
+.msg.assistant{align-self:flex-start;background:rgba(24,36,68,.9);border:1px solid var(--line)}
+.chat-input{display:flex;gap:10px;padding:12px;border-top:1px solid var(--line);background:rgba(12,19,38,.7)}
+.chat-input textarea{flex:1;background:#0c1428;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;min-height:44px;max-height:140px;resize:vertical;outline:none}
+.modal{position:fixed;inset:0;background:rgba(2,6,18,.72);display:flex;align-items:flex-start;justify-content:center;padding:6vh 18px;z-index:50;overflow:auto}
+.modal-card{width:min(760px,100%);background:linear-gradient(180deg,#182444,#101a33);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 30px 100px rgba(0,0,0,.55)}
+.modal-card h3{margin:0 0 16px;font-size:17px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.toast-wrap{position:fixed;right:20px;bottom:20px;z-index:80;display:flex;flex-direction:column;gap:8px}
+.toast{padding:11px 14px;border-radius:10px;background:#182444;border:1px solid var(--line);box-shadow:0 12px 40px rgba(0,0,0,.4);font-size:13px;max-width:360px}
+.toast.ok{border-color:rgba(52,211,153,.45)}
+.toast.bad{border-color:rgba(248,113,113,.45)}
+.note{color:var(--muted);font-size:12px}
+.warnbox{border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:#ffe6a6;border-radius:10px;padding:10px 12px;font-size:12px;margin:10px 0}
+.dangerbox{border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.08);color:#ffc4c4;border-radius:10px;padding:10px 12px;font-size:12px;margin:10px 0}
+.hr{height:1px;background:var(--line);margin:14px 0}
+@media(max-width:980px){.layout{flex-direction:column}.sidebar{width:100%;height:auto;position:static;flex:none;flex-direction:row;flex-wrap:wrap;align-items:center}.sidebar .brand{padding:0 10px 0 0}.nav{flex-direction:row;flex-wrap:wrap}.sidebar .foot{display:none}.card,.card.wide{grid-column:span 12}.two,.three{grid-template-columns:1fr}.main{padding:18px}}
+</style>
+</head>
+<body>
+<div id="login" class="login-wrap">
+  <div class="login-card">
+    <div class="logo">
+      <div class="logo-mark">◈</div>
+      <div><h1>Captain</h1><p>多 Agent 团队控制台</p></div>
+    </div>
+    <h2>登录</h2>
+    <p class="sub">首次启动的初始密码会打印在容器日志中。</p>
+    <form id="login-form">
+      <div class="field">
+        <label>后台密码</label>
+        <input id="login-password" type="password" autocomplete="current-password" placeholder="输入密码" required>
+      </div>
+      <button class="btn primary" style="width:100%;margin-top:6px" type="submit">进入控制台</button>
+    </form>
+    <p id="login-error" class="dangerbox hidden"></p>
+  </div>
+</div>
+
+<div id="app" class="layout hidden">
+  <aside class="sidebar">
+    <div class="brand"><b>◈ Captain</b><span>队长 · 多 Agent 控制台</span></div>
+    <nav class="nav" id="nav">
+      <button data-view="overview" class="active"><span class="ico">▦</span>总览</button>
+      <button data-view="captain"><span class="ico">♛</span>主管</button>
+      <button data-view="team"><span class="ico">◈</span>团队</button>
+      <button data-view="channels"><span class="ico">⇄</span>通道</button>
+      <button data-view="runs"><span class="ico">▤</span>任务</button>
+      <button data-view="chat"><span class="ico">✦</span>对话</button>
+      <button data-view="logs"><span class="ico">⌁</span>日志</button>
+      <button data-view="ops"><span class="ico">⚙</span>运维</button>
+    </nav>
+    <div class="foot">v0.1.0 · Hermes 引擎 + Node 控制台</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h2 id="view-title">总览</h2><div class="sub" id="view-sub">服务状态与团队概览</div></div>
+      <div class="pills" id="top-pills"></div>
+    </div>
+
+    <section id="view-overview" class="view active">
+      <div class="grid">
+        <div class="card"><h3>Hermes 引擎</h3><div class="muted">Agent 运行时</div><div class="kpi" id="kpi-hermes">—</div><div class="muted" id="kpi-hermes-sub">检查中</div></div>
+        <div class="card"><h3>QQ</h3><div class="muted">NapCat / OneBot</div><div class="kpi" id="kpi-qq">—</div><div class="muted" id="kpi-qq-sub">未启用</div></div>
+        <div class="card"><h3>员工</h3><div class="muted">已配置 agent</div><div class="kpi" id="kpi-team">—</div><div class="muted" id="kpi-team-sub">—</div></div>
+        <div class="card wide"><h3>最近任务</h3><div class="muted">来自 Hermes 的会话记录</div><div id="overview-runs" class="empty">暂无任务</div></div>
+        <div class="card"><h3>Telegram</h3><div class="muted">Bot API 长轮询</div><div class="kpi" id="kpi-tg">—</div><div class="muted" id="kpi-tg-sub">未启用</div></div>
+        <div class="card"><h3>飞书</h3><div class="muted">长连接</div><div class="kpi" id="kpi-feishu">—</div><div class="muted" id="kpi-feishu-sub">未启用</div></div>
+        <div class="card"><h3>运行时长</h3><div class="muted">本次进程</div><div class="kpi" id="kpi-uptime">—</div><div class="muted">自动刷新 15s</div></div>
+      </div>
+    </section>
+
+    <section id="view-captain" class="view hidden">
+      <div class="section">
+        <h3>主管设置</h3>
+        <div class="desc">主管是固定单例，不能删除。API Key、base_url、模型全部由你配置。</div>
+        <form id="captain-form">
+          <div class="two">
+            <div class="field"><label>名称</label><input id="cap-name" placeholder="主管"></div>
+            <div class="field"><label>Provider</label><select id="cap-provider">
+              <option value="openai-compatible">OpenAI 兼容</option>
+              <option value="anthropic">Anthropic / Claude</option>
+              <option value="doubao">豆包 / 火山 Ark</option>
+            </select></div>
+          </div>
+          <div class="two">
+            <div class="field"><label>Base URL</label><input id="cap-baseurl" placeholder="https://api.deepseek.com"></div>
+            <div class="field"><label>模型</label><input id="cap-model" placeholder="deepseek-chat"></div>
+          </div>
+          <div class="field"><label>API Key</label><input id="cap-apikey" type="password" placeholder="sk-..."><div class="hint">留空或显示 **** 表示保持原 Key。Key 加密保存，模型看不到明文。</div></div>
+          <div class="field"><label>标签</label><input id="cap-tags" placeholder="调度,验收"><div class="hint">主管通常只打调度/验收标签，不要给它打生图/语音标签。</div></div>
+          <div class="field"><label>主管提示词</label><textarea id="cap-prompt" placeholder="你是团队主管..."></textarea></div>
+          <div class="row">
+            <button class="btn primary" type="submit">保存主管</button>
+            <button class="btn" type="button" id="cap-test">测试连接</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section">
+        <h3>Hermes 引擎（可选）</h3>
+        <div class="desc">原生编排默认由 Node 直接调用主管和员工的 API。若要使用 Hermes 的 Kanban / 工具 / 编程运行时，在这里配置 Hermes API 和 Dashboard。</div>
+        <form id="hermes-form">
+          <div class="two">
+            <div class="field"><label>API Base URL（8642）</label><input id="h-baseurl" placeholder="http://hermes:8642"></div>
+            <div class="field"><label>API Key</label><input id="h-apikey" type="password" placeholder="留空或 **** 保持原值"></div>
+          </div>
+          <div class="two">
+            <div class="field"><label>Dashboard URL（9119）</label><input id="h-bridgeurl" placeholder="http://hermes:9119"></div>
+            <div class="field"><label>Dashboard Session Token</label><input id="h-bridgetoken" type="password" placeholder="HERMES_DASHBOARD_SESSION_TOKEN"></div>
+          </div>
+          <div class="two">
+            <div class="field"><label>编排引擎</label><select id="h-engine"><option value="native">native（Node 原生编排）</option><option value="hermes">hermes（全部交给 Hermes）</option><option value="auto">auto（无主管 Key 时用 Hermes）</option></select></div>
+            <div class="field"><label>Hermes 启用</label><select id="h-enabled"><option value="true">启用</option><option value="false">停用</option></select></div>
+          </div>
+          <div class="row"><button class="btn primary" type="submit">保存 Hermes 设置</button></div>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-team" class="view hidden">
+      <div class="spread" style="margin-bottom:14px">
+        <div><h3 style="margin:0">团队花名册</h3><div class="note">每个员工绑定一个 API、模型和标签。标签决定主管把什么任务派给谁。</div></div>
+        <button class="btn primary" id="add-agent">＋ 新增员工</button>
+      </div>
+      <div class="section" style="padding:0;overflow:hidden">
+        <table>
+          <thead><tr><th>员工</th><th>类型</th><th>标签</th><th>模型</th><th>状态</th><th style="width:170px">操作</th></tr></thead>
+          <tbody id="team-body"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="view-channels" class="view hidden">
+      <div class="tabs" id="channel-tabs">
+        <button data-channel="qq" class="active">QQ</button>
+        <button data-channel="telegram">Telegram</button>
+        <button data-channel="feishu">飞书</button>
+      </div>
+
+      <div id="channel-qq" class="channel-pane">
+        <div class="section">
+          <h3>QQ 登录 / NapCat</h3>
+          <div class="desc">QQ 协议由 NapCat 完成。首次登录请打开 NapCat WebUI 扫码或输入账号密码；登录态持久化在 /data/napcat。</div>
+          <div class="warnbox">NapCat 是非官方协议，建议使用专用小号，存在风控/封号风险。群聊默认只有 @机器人 才响应。</div>
+          <div class="row" style="margin-bottom:14px">
+            <a class="btn primary" href="/napcat/" target="_blank" rel="noopener">打开 NapCat 登录页</a>
+            <button class="btn" type="button" id="qq-refresh">刷新 QQ 状态</button>
+            <span class="badge" id="qq-status-badge">未知</span>
+          </div>
+          <form id="qq-form">
+            <div class="two">
+              <div class="field"><label>NapCat WS 地址</label><input id="qq-ws" placeholder="ws://napcat:3001"></div>
+              <div class="field"><label>Access Token</label><input id="qq-token" type="password" placeholder="留空或 **** 保持原值"></div>
+            </div>
+            <div class="field"><label>NapCat WebUI 地址</label><input id="qq-webui" placeholder="http://napcat:6099"><div class="hint">后台通过 /napcat/ 代理这个地址；NapCat 的 6099 不需要对公网开放。</div></div>
+            <div class="three">
+              <div class="field"><label>用户白名单（一行一个 QQ）</label><textarea id="qq-users" class="whitelist" placeholder="123456789"></textarea></div>
+              <div class="field"><label>群白名单（一行一个群号）</label><textarea id="qq-groups" class="whitelist" placeholder="987654321"></textarea></div>
+              <div class="field"><label>老板 QQ（可管理团队）</label><textarea id="qq-owners" class="whitelist" placeholder="123456789"></textarea></div>
+            </div>
+            <div class="field"><label>群内触发方式</label><select id="qq-trigger"><option value="mention">必须 @机器人</option><option value="prefix">命令前缀</option><option value="all">所有消息</option></select></div>
+            <div class="row"><button class="btn primary" type="submit">保存 QQ 配置</button><label class="note"><input type="checkbox" id="qq-enabled"> 启用 QQ 通道</label></div>
+          </form>
+        </div>
+      </div>
+
+      <div id="channel-telegram" class="channel-pane hidden">
+        <div class="section">
+          <h3>Telegram Bot</h3>
+          <div class="desc">官方 Bot API 长轮询，不需要公网回调。群聊默认 @机器人 触发。</div>
+          <form id="tg-form">
+            <div class="field"><label>Bot Token</label><input id="tg-token" type="password" placeholder="123456:ABC..."><div class="hint">留空或显示 **** 表示保持原值。</div></div>
+            <div class="three">
+              <div class="field"><label>用户白名单（一行一个 user id）</label><textarea id="tg-users" class="whitelist"></textarea></div>
+              <div class="field"><label>群/会话白名单（一行一个 chat id）</label><textarea id="tg-chats" class="whitelist"></textarea></div>
+              <div class="field"><label>老板 ID</label><textarea id="tg-owners" class="whitelist"></textarea></div>
+            </div>
+            <div class="row"><button class="btn primary" type="submit">保存 Telegram 配置</button><label class="note"><input type="checkbox" id="tg-enabled"> 启用 Telegram 通道</label></div>
+          </form>
+        </div>
+      </div>
+
+      <div id="channel-feishu" class="channel-pane hidden">
+        <div class="section">
+          <h3>飞书 / Lark</h3>
+          <div class="desc">官方长连接，不需要公网回调。需要在飞书开放平台创建应用并开启机器人能力。</div>
+          <form id="feishu-form">
+            <div class="two">
+              <div class="field"><label>App ID</label><input id="fs-appid" placeholder="cli_..."></div>
+              <div class="field"><label>App Secret</label><input id="fs-secret" type="password" placeholder="留空或 **** 保持原值"></div>
+            </div>
+            <div class="three">
+              <div class="field"><label>用户白名单（open_id，一行一个）</label><textarea id="fs-users" class="whitelist"></textarea></div>
+              <div class="field"><label>群/会话白名单（chat_id，一行一个）</label><textarea id="fs-chats" class="whitelist"></textarea></div>
+              <div class="field"><label>老板 open_id</label><textarea id="fs-owners" class="whitelist"></textarea></div>
+            </div>
+            <div class="row"><button class="btn primary" type="submit">保存飞书配置</button><label class="note"><input type="checkbox" id="fs-enabled"> 启用飞书通道</label></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-runs" class="view hidden">
+      <div class="spread" style="margin-bottom:14px"><div><h3 style="margin:0">任务记录</h3><div class="note">每次对话的入口、状态、耗时和最终结果。</div></div><button class="btn" id="runs-refresh">刷新</button></div>
+      <div class="section" style="padding:0;overflow:hidden">
+        <table>
+          <thead><tr><th>时间</th><th>通道</th><th>用户</th><th>状态</th><th>耗时</th><th>输入</th></tr></thead>
+          <tbody id="runs-body"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="view-chat" class="view hidden">
+      <div class="section" style="padding:0;overflow:hidden">
+        <div class="chat-box">
+          <div class="chat-log" id="chat-log"><div class="msg assistant">在这里直接和主管对话。消息会走当前配置的 Hermes 引擎。</div></div>
+          <div class="chat-input">
+            <textarea id="chat-text" placeholder="给主管发消息…"></textarea>
+            <button class="btn primary" id="chat-send">发送</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-logs" class="view hidden">
+      <div class="section">
+        <h3>日志</h3>
+        <div class="row" style="margin-bottom:12px">
+          <select id="log-svc"><option value="core">core</option><option value="admin">admin</option></select>
+          <input id="log-q" placeholder="关键词过滤" style="max-width:240px">
+          <select id="log-lines"><option>200</option><option>500</option><option>1000</option><option>2000</option></select>
+          <button class="btn" id="log-refresh">刷新</button>
+          <label class="note"><input type="checkbox" id="log-auto"> 自动刷新 5s</label>
+        </div>
+        <pre class="pre" id="log-output">加载中…</pre>
+      </div>
+    </section>
+
+    <section id="view-ops" class="view hidden">
+      <div class="section">
+        <h3>配置导出 / 导入</h3>
+        <div class="desc">导出默认打码；完整导出包含明文密钥，请只在可信环境使用。</div>
+        <div class="row"><a class="btn" href="/api/export" download="captain-config.json">导出（打码）</a><a class="btn danger" href="/api/export?secrets=full" download="captain-config.json">导出（含密钥）</a></div>
+        <div class="hr"></div>
+        <div class="field"><label>导入配置文件</label><input type="file" id="import-file" accept="application/json"><div class="hint">导入后会覆盖业务配置并重载通道。</div></div>
+        <button class="btn" id="import-btn">导入</button>
+      </div>
+      <div class="section">
+        <h3>修改后台密码</h3>
+        <form id="password-form"><div class="field"><label>新密码（至少 8 位）</label><input id="new-password" type="password" autocomplete="new-password"></div><button class="btn primary" type="submit">修改密码</button></form>
+      </div>
+      <div class="section">
+        <h3>运维</h3>
+        <div class="row"><button class="btn danger" id="restart-btn">重启服务</button><span class="note">进程退出后由 Docker restart 策略拉起。</span></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <h3 id="modal-title">编辑</h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions"><button class="btn" id="modal-cancel">取消</button><button class="btn primary" id="modal-save">保存</button></div>
+  </div>
+</div>
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+const state = { session:null, status:null, config:null, team:null, runs:[], view:'overview', editing:null, logTimer:null };
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const fmtTime = (iso) => { try { return new Date(iso).toLocaleString(); } catch { return iso || ''; } };
+const fmtDuration = (ms) => { if (!ms) return '—'; if (ms < 1000) return ms + 'ms'; if (ms < 60000) return (ms/1000).toFixed(1) + 's'; return (ms/60000).toFixed(1) + 'm'; };
+
+function toast(message, type='info') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type === 'ok' ? 'ok' : type === 'bad' ? 'bad' : '');
+  el.textContent = message;
+  $('#toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+async function api(path, options={}) {
+  const opts = { credentials:'same-origin', ...options };
+  if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
+    opts.headers = { 'content-type':'application/json', ...(opts.headers||{}) };
+    opts.body = JSON.stringify(opts.body);
+  }
+  const res = await fetch(path, opts);
+  let payload = {};
+  try { payload = await res.json(); } catch { payload = {}; }
+  if (res.status === 401) { showLogin(); throw new Error('未登录'); }
+  if (!res.ok || payload.ok === false) throw new Error(payload.error || ('HTTP ' + res.status));
+  return payload.data;
+}
+
+function showLogin() {
+  $('#login').classList.remove('hidden');
+  $('#app').classList.add('hidden');
+  stopLogTimer();
+}
+function showApp() {
+  $('#login').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+}
+
+async function boot() {
+  try {
+    const s = await api('/api/session');
+    state.session = s;
+    if (!s.authenticated) return showLogin();
+    showApp();
+    await loadAll();
+    if (s.mustChange) toast('当前还是初始密码，请到「运维」修改密码', 'bad');
+  } catch { showLogin(); }
+}
+
+async function loadAll() {
+  const [status, config, team, runs] = await Promise.all([
+    api('/api/status'), api('/api/config'), api('/api/agents'), api('/api/runs?limit=50')
+  ]);
+  state.status = status; state.config = config; state.team = team; state.runs = runs;
+  renderTopPills(); renderOverview(); renderCaptain(); renderTeam(); renderChannels(); renderRuns();
+}
+
+function renderTopPills() {
+  const s = state.status || {};
+  const pill = (label, ok, detail='') => `<span class="pill"><span class="dot ${ok?'ok':'bad'}"></span>${esc(label)}${detail?` · ${esc(detail)}`:''}</span>`;
+  const hermes = s.hermes?.ok;
+  const qq = s.channels?.qq?.online;
+  const tg = s.channels?.telegram?.online;
+  const fs = s.channels?.feishu?.online;
+  $('#top-pills').innerHTML = [
+    pill('Hermes', hermes),
+    pill('QQ', qq, s.channels?.qq?.nickname || ''),
+    pill('Telegram', tg, s.channels?.telegram?.botUsername || ''),
+    pill('飞书', fs)
+  ].join('');
+}
+
+function renderOverview() {
+  const s = state.status || {};
+  $('#kpi-hermes').textContent = s.hermes?.ok ? '在线' : '离线';
+  $('#kpi-hermes').style.color = s.hermes?.ok ? 'var(--ok)' : 'var(--bad)';
+  $('#kpi-hermes-sub').textContent = s.hermes?.ok ? `延迟 ${s.hermes.ms ?? '—'}ms` : (s.hermes?.error || '未配置');
+  $('#kpi-qq').textContent = s.channels?.qq?.online ? '在线' : '离线';
+  $('#kpi-qq').style.color = s.channels?.qq?.online ? 'var(--ok)' : 'var(--muted)';
+  $('#kpi-qq-sub').textContent = s.channels?.qq?.nickname ? `${s.channels.qq.nickname} (${s.channels.qq.selfId})` : (state.config?.channels?.qq?.enabled ? (s.channels?.qq?.lastError || '已启用') : '未启用');
+  $('#kpi-team').textContent = s.team?.agentCount ?? 0;
+  $('#kpi-team-sub').textContent = `启用 ${s.team?.enabledCount ?? 0} / 上限 ${state.team?.maxAgents ?? '—'}`;
+  const runs = state.runs.slice(0, 6);
+  $('#overview-runs').className = runs.length ? '' : 'empty';
+  $('#overview-runs').innerHTML = runs.length ? `<table><thead><tr><th>时间</th><th>通道</th><th>状态</th><th>输入</th></tr></thead><tbody>${runs.map(r=>`<tr class="run-row" data-run="${esc(r.id)}"><td class="mono">${esc(fmtTime(r.createdAt))}</td><td>${esc(r.channel)}</td><td><span class="badge ${r.status==='completed'?'ok':r.status==='failed'?'bad':'warn'}">${esc(r.status)}</span></td><td>${esc(String(r.text||'').slice(0,40))}</td></tr>`).join('')}</tbody></table>` : '暂无任务';
+  $$('#overview-runs .run-row').forEach(row => row.onclick = () => openRun(row.dataset.run));
+  $('#kpi-tg').textContent = s.channels?.telegram?.online ? '在线' : '离线';
+  $('#kpi-tg').style.color = s.channels?.telegram?.online ? 'var(--ok)' : 'var(--muted)';
+  $('#kpi-tg-sub').textContent = s.channels?.telegram?.botUsername ? '@' + s.channels.telegram.botUsername : (state.config?.channels?.telegram?.enabled ? (s.channels?.telegram?.lastError || '已启用') : '未启用');
+  $('#kpi-feishu').textContent = s.channels?.feishu?.online ? '在线' : '离线';
+  $('#kpi-feishu').style.color = s.channels?.feishu?.online ? 'var(--ok)' : 'var(--muted)';
+  $('#kpi-feishu-sub').textContent = state.config?.channels?.feishu?.enabled ? (s.channels?.feishu?.lastError || '已启用') : '未启用';
+  const up = s.uptimeMs || 0;
+  $('#kpi-uptime').textContent = up > 3600000 ? (up/3600000).toFixed(1) + 'h' : Math.round(up/60000) + 'm';
+  renderQQStatus();
+}
+
+function renderCaptain() {
+  const c = state.team?.captain;
+  if (!c) return;
+  $('#cap-name').value = c.name || '';
+  $('#cap-provider').value = c.provider || 'openai-compatible';
+  $('#cap-baseurl').value = c.baseUrl || '';
+  $('#cap-model').value = c.model || '';
+  $('#cap-apikey').value = c.apiKey || '';
+  $('#cap-tags').value = (c.tags || []).join(',');
+  $('#cap-prompt').value = c.systemPrompt || '';
+  const h = state.config?.hermes || {};
+  $('#h-baseurl').value = h.baseUrl || '';
+  $('#h-apikey').value = h.apiKey || '';
+  $('#h-bridgeurl').value = h.bridgeUrl || '';
+  $('#h-bridgetoken').value = h.bridgeToken || '';
+  $('#h-engine').value = state.config?.orchestration?.engine || 'native';
+  $('#h-enabled').value = h.enabled === false ? 'false' : 'true';
+}
+
+function renderTeam() {
+  const agents = state.team?.agents || [];
+  const body = $('#team-body');
+  if (!agents.length) {
+    body.innerHTML = '<tr><td colspan="6" class="empty">还没有员工。点击右上角「新增员工」添加第一个。</td></tr>';
+    return;
+  }
+  body.innerHTML = agents.map(a => `<tr>
+    <td><b>${esc(a.name)}</b><div class="note mono">${esc(a.id)}${a.department ? ' · ' + esc(a.department) : ''}</div></td>
+    <td><span class="badge blue">${esc(a.kind)}</span></td>
+    <td>${(a.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('') || '<span class="note">无</span>'}</td>
+    <td class="mono">${esc(a.model)}<div class="note">${esc(a.provider)}</div></td>
+    <td><span class="badge ${a.enabled?'ok':'warn'}">${a.enabled?'启用':'停用'}</span></td>
+    <td><button class="btn small" data-edit="${esc(a.id)}">编辑</button> <button class="btn small danger" data-del="${esc(a.id)}">删除</button></td>
+  </tr>`).join('');
+  $$('[data-edit]', body).forEach(btn => btn.onclick = () => openAgentModal(state.team.agents.find(a => a.id === btn.dataset.edit)));
+  $$('[data-del]', body).forEach(btn => btn.onclick = () => deleteAgent(btn.dataset.del));
+}
+
+function renderChannels() {
+  const c = state.config?.channels || {};
+  const qq = c.qq || {}; const tg = c.telegram || {}; const fs = c.feishu || {};
+  $('#qq-ws').value = qq.wsUrl || '';
+  $('#qq-token').value = qq.accessToken || '';
+  $('#qq-webui').value = qq.webuiUrl || '';
+  $('#qq-users').value = (qq.allowUsers||[]).join('\n');
+  $('#qq-groups').value = (qq.allowGroups||[]).join('\n');
+  $('#qq-owners').value = (qq.owners||[]).join('\n');
+  $('#qq-trigger').value = qq.groupTrigger || 'mention';
+  $('#qq-enabled').checked = qq.enabled === true;
+  $('#tg-token').value = tg.token || '';
+  $('#tg-users').value = (tg.allowUsers||[]).join('\n');
+  $('#tg-chats').value = (tg.allowChats||[]).join('\n');
+  $('#tg-owners').value = (tg.owners||[]).join('\n');
+  $('#tg-enabled').checked = tg.enabled === true;
+  $('#fs-appid').value = fs.appId || '';
+  $('#fs-secret').value = fs.appSecret || '';
+  $('#fs-users').value = (fs.allowUsers||[]).join('\n');
+  $('#fs-chats').value = (fs.allowChats||[]).join('\n');
+  $('#fs-owners').value = (fs.owners||[]).join('\n');
+  $('#fs-enabled').checked = fs.enabled === true;
+  renderQQStatus();
+}
+
+function renderQQStatus() {
+  const qq = state.status?.channels?.qq;
+  const badge = $('#qq-status-badge');
+  if (!badge) return;
+  if (!qq) { badge.textContent = '未知'; badge.className = 'badge'; return; }
+  if (qq.online) { badge.textContent = `在线 · ${qq.nickname || ''} ${qq.selfId || ''}`; badge.className = 'badge ok'; }
+  else { badge.textContent = qq.lastError ? `离线 · ${qq.lastError}` : '离线'; badge.className = 'badge bad'; }
+}
+
+function renderRuns() {
+  const runs = state.runs || [];
+  const body = $('#runs-body');
+  if (!runs.length) { body.innerHTML = '<tr><td colspan="6" class="empty">暂无任务</td></tr>'; return; }
+  body.innerHTML = runs.map(r => `<tr class="run-row" data-run="${esc(r.id)}">
+    <td class="mono">${esc(fmtTime(r.createdAt))}</td><td>${esc(r.channel)}</td><td>${esc(r.userName || r.userId)}</td>
+    <td><span class="badge ${r.status==='completed'?'ok':r.status==='failed'?'bad':'warn'}">${esc(r.status)}</span></td>
+    <td>${esc(fmtDuration(r.durationMs))}</td><td>${esc(String(r.text||'').slice(0,60))}</td>
+  </tr>`).join('');
+  $$('[data-run]', body).forEach(row => row.onclick = () => openRun(row.dataset.run));
+}
+
+async function openRun(id) {
+  try {
+    const run = await api('/api/runs/' + encodeURIComponent(id));
+    const tasks = Array.isArray(run.tasks) ? run.tasks : [];
+    const tasksHtml = tasks.length ? `<div class="section" style="padding:14px"><h3>任务拆解</h3><table><thead><tr><th>任务</th><th>类型</th><th>员工</th><th>状态</th><th>产出</th></tr></thead><tbody>${tasks.map(t=>`<tr><td>${esc(t.title || t.id)}</td><td><span class="badge blue">${esc(t.kind)}</span></td><td>${esc(t.agent || '—')}</td><td><span class="badge ${t.status==='done'?'ok':t.status==='failed'?'bad':'warn'}">${esc(t.status)}</span></td><td>${esc(String(t.text || t.error || '').slice(0, 300))}${(t.files||[]).map(f=>`<div class="note mono">${esc(f)}</div>`).join('')}</td></tr>`).join('')}</tbody></table></div>` : '';
+    const verificationHtml = run.verification ? `<div class="section" style="padding:14px"><h3>验收</h3><pre class="pre">${esc(JSON.stringify(run.verification, null, 2))}</pre></div>` : '';
+    openModal('任务详情', `<div class="two"><div class="field"><label>状态</label><input value="${esc(run.status)}" disabled></div><div class="field"><label>耗时</label><input value="${esc(fmtDuration(run.durationMs))}" disabled></div></div>
+      <div class="field"><label>入口 / 用户</label><input value="${esc(run.channel)} / ${esc(run.userName || run.userId)}" disabled></div>
+      <div class="field"><label>输入</label><textarea disabled>${esc(run.text)}</textarea></div>
+      <div class="field"><label>输出</label><textarea disabled style="min-height:180px">${esc(run.reply || '')}</textarea></div>
+      ${run.error ? `<div class="dangerbox">${esc(run.error)}</div>` : ''}
+      ${tasksHtml}
+      ${verificationHtml}`, null, null);
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+function openAgentModal(agent) {
+  state.editing = agent || null;
+  const isEdit = Boolean(agent);
+  const a = agent || { name:'', kind:'image', provider:'doubao', baseUrl:'https://ark.cn-beijing.volces.com/api/v3', model:'', apiKey:'', tags:[], systemPrompt:'', enabled:true, maxConcurrency:1, timeoutMs:300000 };
+  openModal(isEdit ? '编辑员工' : '新增员工', `
+    <div class="two"><div class="field"><label>名称</label><input id="m-name" value="${esc(a.name)}" placeholder="豆包画师"></div>
+    <div class="field"><label>执行类型</label><select id="m-kind">${['llm','code','image','tts','asr','video'].map(k=>`<option value="${k}" ${a.kind===k?'selected':''}>${k}</option>`).join('')}</select></div></div>
+    <div class="two"><div class="field"><label>Provider</label><input id="m-provider" value="${esc(a.provider)}" placeholder="doubao / openai-compatible / anthropic"></div>
+    <div class="field"><label>Base URL</label><input id="m-baseurl" value="${esc(a.baseUrl)}" placeholder="https://..."></div></div>
+    <div class="two"><div class="field"><label>模型</label><input id="m-model" value="${esc(a.model)}" placeholder="doubao-seedream"></div>
+    <div class="field"><label>标签（逗号分隔）</label><input id="m-tags" value="${esc((a.tags||[]).join(','))}" placeholder="生图,海报"></div></div>
+    <div class="field"><label>API Key</label><input id="m-apikey" type="password" value="${esc(a.apiKey || '')}" placeholder="留空或 **** 保持原值"></div>
+    <div class="field"><label>职责提示词</label><textarea id="m-prompt" placeholder="你是团队里的...">${esc(a.systemPrompt || '')}</textarea></div>
+    <div class="three"><div class="field"><label>最大并发</label><input id="m-concurrency" type="number" min="1" max="20" value="${a.maxConcurrency||1}"></div>
+    <div class="field"><label>超时 ms</label><input id="m-timeout" type="number" min="5000" value="${a.timeoutMs||300000}"></div>
+    <div class="field"><label>状态</label><select id="m-enabled"><option value="true" ${a.enabled!==false?'selected':''}>启用</option><option value="false" ${a.enabled===false?'selected':''}>停用</option></select></div></div>
+    <div id="m-warnings"></div>`,
+    async () => {
+      const payload = {
+        name: $('#m-name').value.trim(), kind: $('#m-kind').value, provider: $('#m-provider').value.trim(),
+        baseUrl: $('#m-baseurl').value.trim(), model: $('#m-model').value.trim(), apiKey: $('#m-apikey').value,
+        tags: $('#m-tags').value.split(/[,，、]/).map(s=>s.trim()).filter(Boolean),
+        systemPrompt: $('#m-prompt').value, enabled: $('#m-enabled').value === 'true',
+        maxConcurrency: Number($('#m-concurrency').value) || 1, timeoutMs: Number($('#m-timeout').value) || 300000
+      };
+      if (!payload.name || !payload.model) { toast('名称和模型不能为空', 'bad'); return false; }
+      if (isEdit) await api('/api/agents/' + encodeURIComponent(a.id), { method:'PUT', body:payload });
+      else await api('/api/agents', { method:'POST', body:payload });
+      toast('已保存', 'ok'); await refreshTeamAndStatus(); return true;
+    }, { extra: isEdit ? `<button class="btn" id="m-test">测试连接</button>` : '' });
+  const testBtn = $('#m-test');
+  if (testBtn) testBtn.onclick = async () => {
+    try {
+      const body = { id: a.id, name:$('#m-name').value, kind:$('#m-kind').value, provider:$('#m-provider').value, baseUrl:$('#m-baseurl').value, model:$('#m-model').value, apiKey:$('#m-apikey').value };
+      const r = await api('/api/agents/test', { method:'POST', body });
+      toast(r.ok ? `连接成功${r.ms ? ' · ' + r.ms + 'ms' : ''}` : (r.message || '已保存'), 'ok');
+    } catch(e) { toast(e.message, 'bad'); }
+  };
+}
+
+function openModal(title, html, onSave, { extra = '' } = {}) {
+  $('#modal-title').textContent = title;
+  $('#modal-body').innerHTML = html;
+  $('#modal').classList.remove('hidden');
+  const close = () => { $('#modal').classList.add('hidden'); $('#modal-save').onclick = null; };
+  $('#modal-cancel').onclick = close;
+  $('#modal-save').style.display = onSave ? '' : 'none';
+  $('#modal-save').onclick = async () => { if (!onSave) return close(); try { const done = await onSave(); if (done !== false) close(); } catch(e) { toast(e.message, 'bad'); } };
+  const oldExtra = $('#modal-extra');
+  if (oldExtra) oldExtra.remove();
+  if (extra) { const div = document.createElement('div'); div.id='modal-extra'; div.innerHTML = extra; $('#modal-body').appendChild(div); }
+}
+
+async function deleteAgent(id) {
+  if (!confirm('确定删除这个员工吗？删除后主管将无法再把任务派给它。')) return;
+  try { await api('/api/agents/' + encodeURIComponent(id), { method:'DELETE' }); toast('已删除', 'ok'); await refreshTeamAndStatus(); }
+  catch(e) { toast(e.message, 'bad'); }
+}
+
+async function refreshTeamAndStatus() {
+  const [status, team, config] = await Promise.all([api('/api/status'), api('/api/agents'), api('/api/config')]);
+  state.status = status; state.team = team; state.config = config;
+  renderTopPills(); renderOverview(); renderCaptain(); renderTeam(); renderChannels();
+}
+
+function collectForm(ids) {
+  const out = {};
+  for (const [key, id] of Object.entries(ids)) { const el = $('#' + id); if (el) out[key] = el.type === 'checkbox' ? el.checked : el.value; }
+  return out;
+}
+function lines(value) { return String(value || '').split(/\n/).map(s=>s.trim()).filter(Boolean); }
+
+async function saveChannel(name) {
+  try {
+    if (name === 'qq') {
+      await api('/api/config', { method:'PUT', body:{ channels:{ qq:{
+        enabled: $('#qq-enabled').checked, wsUrl: $('#qq-ws').value.trim(), accessToken: $('#qq-token').value,
+        webuiUrl: $('#qq-webui').value.trim(), allowUsers: lines($('#qq-users').value), allowGroups: lines($('#qq-groups').value),
+        owners: lines($('#qq-owners').value), groupTrigger: $('#qq-trigger').value } } } });
+    }
+    if (name === 'telegram') {
+      await api('/api/config', { method:'PUT', body:{ channels:{ telegram:{
+        enabled: $('#tg-enabled').checked, token: $('#tg-token').value, allowUsers: lines($('#tg-users').value),
+        allowChats: lines($('#tg-chats').value), owners: lines($('#tg-owners').value), groupTrigger:'mention' } } } });
+    }
+    if (name === 'feishu') {
+      await api('/api/config', { method:'PUT', body:{ channels:{ feishu:{
+        enabled: $('#fs-enabled').checked, appId: $('#fs-appid').value.trim(), appSecret: $('#fs-secret').value,
+        allowUsers: lines($('#fs-users').value), allowChats: lines($('#fs-chats').value), owners: lines($('#fs-owners').value), groupTrigger:'mention' } } } });
+    }
+    toast('通道配置已保存，正在重载', 'ok');
+    setTimeout(() => refreshTeamAndStatus().catch(()=>{}), 900);
+  } catch(e) { toast(e.message, 'bad'); }
+}
+
+async function loadLogs() {
+  const svc = $('#log-svc').value; const linesN = $('#log-lines').value; const q = $('#log-q').value;
+  try { const r = await api('/api/logs?svc=' + encodeURIComponent(svc) + '&lines=' + linesN + '&q=' + encodeURIComponent(q)); $('#log-output').textContent = r.lines.join('\n') || '（空）'; }
+  catch(e) { $('#log-output').textContent = '加载失败: ' + e.message; }
+}
+function startLogTimer() { stopLogTimer(); state.logTimer = setInterval(loadLogs, 5000); }
+function stopLogTimer() { if (state.logTimer) clearInterval(state.logTimer); state.logTimer = null; }
+
+function switchView(name) {
+  state.view = name;
+  $$('.view').forEach(v => v.classList.add('hidden'));
+  const view = $('#view-' + name); if (view) view.classList.remove('hidden');
+  $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  const meta = { overview:['总览','服务状态与团队概览'], captain:['主管','固定单例，配置 API、模型与提示词'], team:['团队','动态增删员工，按标签派活'], channels:['通道','QQ / Telegram / 飞书 与白名单'], runs:['任务','任务记录与最终结果'], chat:['对话','直接和主管对话'], logs:['日志','运行日志'], ops:['运维','导入导出、密码与重启'] }[name] || [name,''];
+  $('#view-title').textContent = meta[0]; $('#view-sub').textContent = meta[1];
+  if (name === 'logs') loadLogs(); if (name === 'runs') { api('/api/runs?limit=100').then(r => { state.runs = r; renderRuns(); }).catch(()=>{}); }
+  if (name !== 'logs') stopLogTimer();
+}
+
+async function sendChat() {
+  const text = $('#chat-text').value.trim(); if (!text) return;
+  const log = $('#chat-log'); log.insertAdjacentHTML('beforeend', `<div class="msg user">${esc(text)}</div>`);
+  $('#chat-text').value = ''; log.scrollTop = log.scrollHeight;
+  const waiting = document.createElement('div'); waiting.className = 'msg assistant'; waiting.textContent = '主管思考中…'; log.appendChild(waiting); log.scrollTop = log.scrollHeight;
+  try { const r = await api('/api/chat', { method:'POST', body:{ text } }); waiting.textContent = r.reply || '（无回复）'; }
+  catch(e) { waiting.textContent = '调用失败: ' + e.message; }
+  log.scrollTop = log.scrollHeight;
+}
+
+function bindEvents() {
+  $('#login-form').onsubmit = async (e) => {
+    e.preventDefault();
+    $('#login-error').classList.add('hidden');
+    try { await api('/api/login', { method:'POST', body:{ password: $('#login-password').value } }); state.session = await api('/api/session'); showApp(); await loadAll(); }
+    catch(err) { $('#login-error').textContent = err.message; $('#login-error').classList.remove('hidden'); }
+  };
+  $('#nav').onclick = (e) => { const btn = e.target.closest('button[data-view]'); if (btn) switchView(btn.dataset.view); };
+  $('#runs-refresh').onclick = () => switchView('runs');
+  $('#add-agent').onclick = () => openAgentModal(null);
+  $('#cap-test').onclick = async () => {
+    try { const r = await api('/api/captain/test', { method:'POST', body:{ name:$('#cap-name').value, provider:$('#cap-provider').value, baseUrl:$('#cap-baseurl').value, model:$('#cap-model').value, apiKey:$('#cap-apikey').value } }); toast(r.ok ? `连接成功${r.ms ? ' · ' + r.ms + 'ms' : ''}` : (r.message || '已保存'), 'ok'); }
+    catch(e) { toast(e.message, 'bad'); }
+  };
+  $('#captain-form').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api('/api/captain', { method:'PUT', body:{ name:$('#cap-name').value, provider:$('#cap-provider').value, baseUrl:$('#cap-baseurl').value, model:$('#cap-model').value, apiKey:$('#cap-apikey').value, tags:$('#cap-tags').value.split(/[,，、]/).map(s=>s.trim()).filter(Boolean), systemPrompt:$('#cap-prompt').value } }); toast('主管已保存', 'ok'); await refreshTeamAndStatus(); }
+    catch(err) { toast(err.message, 'bad'); }
+  };
+  $('#hermes-form').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api('/api/config', { method:'PUT', body:{
+        hermes:{ enabled:$('#h-enabled').value==='true', baseUrl:$('#h-baseurl').value.trim(), apiKey:$('#h-apikey').value, bridgeUrl:$('#h-bridgeurl').value.trim(), bridgeToken:$('#h-bridgetoken').value },
+        orchestration:{ engine:$('#h-engine').value }
+      } });
+      toast('Hermes 设置已保存', 'ok'); await refreshTeamAndStatus();
+    } catch(err) { toast(err.message, 'bad'); }
+  };
+  $$('#channel-tabs button').forEach(btn => btn.onclick = () => {
+    $$('#channel-tabs button').forEach(b => b.classList.toggle('active', b === btn));
+    $$('.channel-pane').forEach(p => p.classList.add('hidden'));
+    $('#channel-' + btn.dataset.channel).classList.remove('hidden');
+  });
+  $('#qq-form').onsubmit = (e) => { e.preventDefault(); saveChannel('qq'); };
+  $('#tg-form').onsubmit = (e) => { e.preventDefault(); saveChannel('telegram'); };
+  $('#feishu-form').onsubmit = (e) => { e.preventDefault(); saveChannel('feishu'); };
+  $('#qq-refresh').onclick = () => refreshTeamAndStatus().catch(e => toast(e.message, 'bad'));
+  $('#log-refresh').onclick = loadLogs;
+  $('#log-auto').onchange = (e) => e.target.checked ? startLogTimer() : stopLogTimer();
+  $('#chat-send').onclick = sendChat;
+  $('#chat-text').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendChat(); };
+  $('#password-form').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await api('/api/password', { method:'POST', body:{ password:$('#new-password').value } }); toast('密码已修改', 'ok'); $('#new-password').value=''; }
+    catch(err) { toast(err.message, 'bad'); }
+  };
+  $('#import-btn').onclick = async () => {
+    const file = $('#import-file').files[0]; if (!file) return toast('请选择 JSON 文件', 'bad');
+    try { const text = await file.text(); const data = JSON.parse(text); await api('/api/import', { method:'POST', body:data }); toast('导入成功，正在重载', 'ok'); setTimeout(()=>refreshTeamAndStatus().catch(()=>{}), 900); }
+    catch(err) { toast(err.message, 'bad'); }
+  };
+  $('#restart-btn').onclick = async () => { if (!confirm('确定重启服务吗？当前连接会短暂中断。')) return; try { await api('/api/restart', { method:'POST' }); toast('正在重启…', 'ok'); } catch(e) { toast(e.message, 'bad'); } };
+}
+
+bindEvents();
+boot();
+setInterval(() => { if (state.session?.authenticated && state.view === 'overview') refreshTeamAndStatus().catch(()=>{}); }, 15000);
+</script>
+</body>
+</html>
