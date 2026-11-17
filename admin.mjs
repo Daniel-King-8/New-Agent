@@ -25,6 +25,7 @@ import {
   updateAgent,
   updateCaptain
 } from './team.mjs';
+import { listModels } from './providers.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.join(ROOT, 'web', 'admin');
@@ -349,6 +350,17 @@ export function createAdminApp({ core, logger }) {
         return ok(res, getTeam());
       }
 
+      if (method === 'POST' && pathname === '/api/agents/reveal-key') {
+        if (!requireAuth(req, res)) return;
+        const body = await readBody(req);
+        const id = String(body?.id || '');
+        const agent = getAgentInternal(id);
+        if (!agent) return fail(res, 404, '员工不存在');
+        if (!agent.apiKey) return fail(res, 400, '该员工没有配置 API Key');
+        logger.info(`查看 API Key: ${agent.id}`);
+        return ok(res, { id: agent.id, apiKey: decryptSecret(agent.apiKey) });
+      }
+
       if (method === 'POST' && pathname === '/api/agents') {
         if (!requireAuth(req, res)) return;
         const body = await readBody(req);
@@ -441,6 +453,26 @@ export function createAdminApp({ core, logger }) {
         const lines = Number(url.searchParams.get('lines') || 200);
         const q = url.searchParams.get('q') || '';
         return ok(res, { service, lines: readLogs(service, lines, q) });
+      }
+
+      if (method === 'POST' && pathname === '/api/models') {
+        if (!requireAuth(req, res)) return;
+        const body = await readBody(req);
+        let apiKey = String(body?.apiKey || '');
+        if ((!apiKey || apiKey.includes('****')) && body?.id) {
+          const agent = getAgentInternal(String(body.id));
+          apiKey = agent ? decryptSecret(agent.apiKey || '') : '';
+        }
+        if (!apiKey && !String(body?.provider || '').toLowerCase().includes('edge')) {
+          return fail(res, 400, '请先填写 API Key');
+        }
+        const result = await listModels({
+          provider: body?.provider,
+          baseUrl: body?.baseUrl,
+          apiKey,
+          kind: body?.kind
+        });
+        return ok(res, result);
       }
 
       if (method === 'GET' && pathname === '/api/hermes/health') {

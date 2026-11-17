@@ -230,6 +230,85 @@ export async function textToSpeech(agent, { text, voiceId, instruction, timeoutM
   return { buffer: await volcTts(agent, text, voice, instruction), mime: 'audio/mpeg', provider: 'volc-tts' };
 }
 
+export async function listModels({ provider, baseUrl, apiKey, kind } = {}) {
+  const p = String(provider || '').toLowerCase();
+  const b = String(baseUrl || '').replace(/\/+$/, '');
+  if (p.includes('edge')) {
+    return { models: [], warning: 'edge-tts 使用音色名，不是模型列表，请手动填写 voice。' };
+  }
+  if (!apiKey) throw new Error('API Key 为空');
+  if (!b) throw new Error('base_url 为空');
+  const started = Date.now();
+
+  if (p.includes('anthropic') || b.includes('anthropic')) {
+    const url = b.endsWith('/v1') ? `${b}/models` : `${b}/v1/models`;
+    const res = await fetch(url, {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      signal: AbortSignal.timeout(20000)
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Anthropic 模型列表 HTTP ${res.status}: ${text.slice(0, 300)}`);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error('Anthropic 模型列表返回不是 JSON');
+    }
+    const items = data.data || data.models || [];
+    return {
+      models: items
+        .map((item) => ({
+          id: String(item.id || item.model || item.name || ''),
+          name: String(item.display_name || item.name || item.id || '')
+        }))
+        .filter((item) => item.id),
+      source: 'live',
+      ms: Date.now() - started
+    };
+  }
+
+  let url = b;
+  if (url.endsWith('/chat/completions')) url = url.slice(0, -'/chat/completions'.length);
+  if (url.endsWith('/images/generations')) url = url.slice(0, -'/images/generations'.length);
+  if (!url.endsWith('/models')) url = `${url}/models`;
+
+  const res = await fetch(url, {
+    headers: { authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(20000)
+  });
+  const text = await res.text();
+  if (res.status === 404) {
+    return {
+      models: [],
+      source: 'unsupported',
+      warning: '该服务商不提供模型列表，请手动填写模型 ID / Endpoint ID。'
+    };
+  }
+  if (!res.ok) throw new Error(`模型列表 HTTP ${res.status}: ${text.slice(0, 300)}`);
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('模型列表返回不是 JSON');
+  }
+  const items = data.data || data.models || data.result?.data || [];
+  const models = items
+    .map((item) => ({
+      id: String(item.id || item.model || item.name || ''),
+      name: String(item.display_name || item.name || item.id || '')
+    }))
+    .filter((item) => item.id);
+  return {
+    models,
+    source: 'live',
+    ms: Date.now() - started,
+    warning: models.length ? '' : '没有返回模型，请手动填写模型 ID。'
+  };
+}
+
 export function providerLabel(agent) {
   return `${agent.name || agent.id} (${agent.kind}/${agent.provider})`;
 }
