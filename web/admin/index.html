@@ -183,17 +183,15 @@ tr:last-child td{border-bottom:0}
         <form id="captain-form">
           <div class="two">
             <div class="field"><label>名称</label><input id="cap-name" placeholder="主管"></div>
-            <div class="field"><label>Provider</label><select id="cap-provider">
-              <option value="openai-compatible">OpenAI 兼容</option>
-              <option value="anthropic">Anthropic / Claude</option>
-              <option value="doubao">豆包 / 火山 Ark</option>
+            <div class="field"><label>Provider（服务商）</label><select id="cap-provider">
+              <option value="openai-compatible">openai-compatible（OpenAI 兼容）</option>
+              <option value="anthropic">anthropic（Anthropic / Claude）</option>
+              <option value="doubao">doubao（豆包 / 火山 Ark）</option>
             </select></div>
           </div>
-          <div class="two">
-            <div class="field"><label>Base URL</label><input id="cap-baseurl" placeholder="https://api.deepseek.com"></div>
-            <div class="field"><label>模型</label><div class="input-with-btn"><input id="cap-model" placeholder="deepseek-chat"><button class="btn small" type="button" id="cap-models">查询模型</button></div></div>
-          </div>
+          <div class="field"><label>Base URL（接口地址）</label><input id="cap-baseurl" placeholder="https://api.deepseek.com"><div class="hint">例如：https://api.deepseek.com；Anthropic 填 https://api.anthropic.com</div></div>
           <div class="field"><label>API Key</label><div class="input-with-btn"><input id="cap-apikey" type="password" placeholder="sk-..."><button class="btn small" type="button" id="cap-eye">显示</button></div><div class="hint">留空或显示 **** 表示保持原 Key。Key 加密保存，模型看不到明文。</div></div>
+          <div class="field"><label>模型</label><div class="input-with-btn"><input id="cap-model" placeholder="deepseek-chat"><button class="btn small" type="button" id="cap-models">查询模型</button></div></div>
           <div class="field"><label>标签</label><input id="cap-tags" placeholder="调度,验收"><div class="hint">主管通常只打调度/验收标签，不要给它打生图/语音标签。</div></div>
           <div class="field"><label>主管提示词</label><textarea id="cap-prompt" placeholder="你是团队主管..."></textarea></div>
           <div class="row">
@@ -231,7 +229,7 @@ tr:last-child td{border-bottom:0}
       </div>
       <div class="section" style="padding:0;overflow:hidden">
         <table>
-          <thead><tr><th>员工</th><th>类型</th><th>标签</th><th>模型</th><th>状态</th><th style="width:170px">操作</th></tr></thead>
+          <thead><tr><th>员工</th><th>类型</th><th>标签</th><th>模型</th><th>状态</th><th style="width:230px">操作</th></tr></thead>
           <tbody id="team-body"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
         </table>
       </div>
@@ -390,6 +388,33 @@ let modelPicker = null;
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const PROVIDERS = [
+  ['openai-compatible', 'openai-compatible（OpenAI 兼容）'],
+  ['anthropic', 'anthropic（Claude）'],
+  ['doubao', 'doubao（豆包/火山）'],
+  ['volc-tts', 'volc-tts（火山语音）'],
+  ['edge-tts', 'edge-tts（Edge TTS）'],
+  ['pollinations', 'pollinations（免费生图）'],
+  ['custom', '自定义（custom）']
+];
+const PROVIDER_CN = {
+  'openai-compatible': 'OpenAI 兼容',
+  anthropic: 'Claude',
+  doubao: '豆包/火山',
+  'volc-tts': '火山语音',
+  'edge-tts': 'Edge TTS',
+  pollinations: '免费生图'
+};
+const providerLabel = (provider) => {
+  const value = String(provider || '');
+  return PROVIDER_CN[value] ? `${value}（${PROVIDER_CN[value]}）` : value;
+};
+const providerIsPreset = (provider) => PROVIDERS.some(([value]) => value === provider && value !== 'custom');
+function providerOptions(selected) {
+  const value = String(selected || '');
+  const known = PROVIDERS.some(([v]) => v === value && v !== 'custom');
+  return PROVIDERS.map(([v, label]) => `<option value="${v}" ${(known ? value : 'custom') === v ? 'selected' : ''}>${esc(label)}</option>`).join('');
+}
 const fmtTime = (iso) => { try { return new Date(iso).toLocaleString(); } catch { return iso || ''; } };
 const fmtDuration = (ms) => { if (!ms) return '—'; if (ms < 1000) return ms + 'ms'; if (ms < 60000) return (ms/1000).toFixed(1) + 's'; return (ms/60000).toFixed(1) + 'm'; };
 
@@ -586,12 +611,25 @@ function renderTeam() {
     <td><b>${esc(a.name)}</b><div class="note mono">${esc(a.id)}${a.department ? ' · ' + esc(a.department) : ''}</div></td>
     <td><span class="badge blue">${esc(kindLabel(a.kind))}</span></td>
     <td>${(a.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('') || '<span class="note">无</span>'}</td>
-    <td class="mono">${esc(a.model)}<div class="note">${esc(a.provider)}</div></td>
+    <td class="mono">${esc(a.model)}<div class="note">${esc(providerLabel(a.provider))}</div></td>
     <td><span class="badge ${a.enabled?'ok':'warn'}">${a.enabled?'启用':'停用'}</span></td>
-    <td><button class="btn small" data-edit="${esc(a.id)}">编辑</button> <button class="btn small danger" data-del="${esc(a.id)}">删除</button></td>
+    <td><button class="btn small" data-test="${esc(a.id)}">检测</button> <button class="btn small" data-edit="${esc(a.id)}">编辑</button> <button class="btn small danger" data-del="${esc(a.id)}">删除</button></td>
   </tr>`).join('');
+  $$('[data-test]', body).forEach(btn => btn.onclick = () => testAgent(btn.dataset.test));
   $$('[data-edit]', body).forEach(btn => btn.onclick = () => openAgentModal(state.team.agents.find(a => a.id === btn.dataset.edit)));
   $$('[data-del]', body).forEach(btn => btn.onclick = () => deleteAgent(btn.dataset.del));
+}
+
+async function testAgent(id) {
+  const agent = (state.team?.agents || []).find((item) => item.id === id);
+  toast(`正在检测 ${agent?.name || id}…`);
+  try {
+    const result = await api('/api/agents/test', { method: 'POST', body: { id } });
+    const detail = result.ms ? ` · ${result.ms}ms` : '';
+    toast(result.ok ? `存活 · ${result.message || '连接成功'}${detail}` : `不可用 · ${result.message || '检测失败'}`, result.ok ? 'ok' : 'bad');
+  } catch (error) {
+    toast(error.message, 'bad');
+  }
 }
 
 function renderChannels() {
@@ -660,22 +698,28 @@ function openAgentModal(agent) {
   state.editing = agent || null;
   const isEdit = Boolean(agent);
   const a = agent || { name:'', kind:'image', provider:'doubao', baseUrl:'https://ark.cn-beijing.volces.com/api/v3', model:'', apiKey:'', tags:[], systemPrompt:'', enabled:true, maxConcurrency:1, timeoutMs:300000 };
+  const customProvider = providerIsPreset(a.provider) ? '' : a.provider;
   openModal(isEdit ? '编辑员工' : '新增员工', `
     <div class="two"><div class="field"><label>名称</label><input id="m-name" value="${esc(a.name)}" placeholder="豆包画师"></div>
     <div class="field"><label>执行类型</label><select id="m-kind">${['llm','code','image','tts','asr','video'].map(k=>`<option value="${k}" ${a.kind===k?'selected':''}>${esc(kindLabel(k))}</option>`).join('')}</select></div></div>
-    <div class="two"><div class="field"><label>Provider</label><input id="m-provider" value="${esc(a.provider)}" placeholder="doubao / openai-compatible / anthropic"></div>
-    <div class="field"><label>Base URL</label><input id="m-baseurl" value="${esc(a.baseUrl)}" placeholder="https://..."></div></div>
+    <div class="two">
+      <div class="field"><label>Base URL（接口地址）</label><input id="m-baseurl" value="${esc(a.baseUrl)}" placeholder="https://..."><div class="hint">例如：https://ark.cn-beijing.volces.com/api/v3</div></div>
+      <div class="field"><label>Provider（服务商）</label><select id="m-provider">${providerOptions(a.provider)}</select><input id="m-provider-custom" class="${providerIsPreset(a.provider) ? 'hidden' : ''}" style="margin-top:8px" value="${esc(customProvider)}" placeholder="自定义 provider"></div>
+    </div>
+    <div class="field"><label>API Key</label><div class="input-with-btn"><input id="m-apikey" type="password" value="${esc(a.apiKey || '')}" placeholder="留空或 **** 保持原值"><button class="btn small" type="button" id="m-eye">显示</button></div></div>
     <div class="two"><div class="field"><label>模型</label><div class="input-with-btn"><input id="m-model" value="${esc(a.model)}" placeholder="doubao-seedream"><button class="btn small" type="button" id="m-models">查询模型</button></div></div>
     <div class="field"><label>标签（逗号分隔）</label><input id="m-tags" value="${esc((a.tags||[]).join(','))}" placeholder="生图,海报"></div></div>
-    <div class="field"><label>API Key</label><div class="input-with-btn"><input id="m-apikey" type="password" value="${esc(a.apiKey || '')}" placeholder="留空或 **** 保持原值"><button class="btn small" type="button" id="m-eye">显示</button></div></div>
     <div class="field"><label>职责提示词</label><textarea id="m-prompt" placeholder="你是团队里的...">${esc(a.systemPrompt || '')}</textarea></div>
     <div class="three"><div class="field"><label>最大并发</label><input id="m-concurrency" type="number" min="1" max="20" value="${a.maxConcurrency||1}"></div>
     <div class="field"><label>超时 ms</label><input id="m-timeout" type="number" min="5000" value="${a.timeoutMs||300000}"></div>
     <div class="field"><label>状态</label><select id="m-enabled"><option value="true" ${a.enabled!==false?'selected':''}>启用</option><option value="false" ${a.enabled===false?'selected':''}>停用</option></select></div></div>
     <div id="m-warnings"></div>`,
     async () => {
+      const provider = $('#m-provider').value === 'custom'
+        ? $('#m-provider-custom').value.trim()
+        : $('#m-provider').value;
       const payload = {
-        name: $('#m-name').value.trim(), kind: $('#m-kind').value, provider: $('#m-provider').value.trim(),
+        name: $('#m-name').value.trim(), kind: $('#m-kind').value, provider,
         baseUrl: $('#m-baseurl').value.trim(), model: $('#m-model').value.trim(), apiKey: $('#m-apikey').value,
         tags: $('#m-tags').value.split(/[,，、]/).map(s=>s.trim()).filter(Boolean),
         systemPrompt: $('#m-prompt').value, enabled: $('#m-enabled').value === 'true',
@@ -686,9 +730,14 @@ function openAgentModal(agent) {
       else await api('/api/agents', { method:'POST', body:payload });
       toast('已保存', 'ok'); await refreshTeamAndStatus(); return true;
     }, { extra: isEdit ? `<button class="btn" id="m-test">测试连接</button>` : '' });
+  const providerSelect = $('#m-provider');
+  const providerCustom = $('#m-provider-custom');
+  const syncProvider = () => providerCustom.classList.toggle('hidden', providerSelect.value !== 'custom');
+  providerSelect.onchange = syncProvider;
+  syncProvider();
   setupKeyToggle('m-apikey', 'm-eye', a.id || null);
   $('#m-models').onclick = () => queryModels({
-    provider: $('#m-provider').value,
+    provider: $('#m-provider').value === 'custom' ? $('#m-provider-custom').value.trim() : $('#m-provider').value,
     baseUrl: $('#m-baseurl').value.trim(),
     apiKey: $('#m-apikey').value,
     kind: $('#m-kind').value,
@@ -698,9 +747,10 @@ function openAgentModal(agent) {
   const testBtn = $('#m-test');
   if (testBtn) testBtn.onclick = async () => {
     try {
-      const body = { id: a.id, name:$('#m-name').value, kind:$('#m-kind').value, provider:$('#m-provider').value, baseUrl:$('#m-baseurl').value, model:$('#m-model').value, apiKey:$('#m-apikey').value };
+      const provider = $('#m-provider').value === 'custom' ? $('#m-provider-custom').value.trim() : $('#m-provider').value;
+      const body = { id: a.id, name:$('#m-name').value, kind:$('#m-kind').value, provider, baseUrl:$('#m-baseurl').value, model:$('#m-model').value, apiKey:$('#m-apikey').value };
       const r = await api('/api/agents/test', { method:'POST', body });
-      toast(r.ok ? `连接成功${r.ms ? ' · ' + r.ms + 'ms' : ''}` : (r.message || '已保存'), 'ok');
+      toast(r.ok ? `存活 · ${r.message || '连接成功'}${r.ms ? ' · ' + r.ms + 'ms' : ''}` : `不可用 · ${r.message || '检测失败'}`, r.ok ? 'ok' : 'bad');
     } catch(e) { toast(e.message, 'bad'); }
   };
 }
@@ -812,7 +862,7 @@ function bindEvents() {
   $('#runs-refresh').onclick = () => switchView('runs');
   $('#add-agent').onclick = () => openAgentModal(null);
   $('#cap-test').onclick = async () => {
-    try { const r = await api('/api/captain/test', { method:'POST', body:{ name:$('#cap-name').value, provider:$('#cap-provider').value, baseUrl:$('#cap-baseurl').value, model:$('#cap-model').value, apiKey:$('#cap-apikey').value } }); toast(r.ok ? `连接成功${r.ms ? ' · ' + r.ms + 'ms' : ''}` : (r.message || '已保存'), 'ok'); }
+    try { const r = await api('/api/captain/test', { method:'POST', body:{ name:$('#cap-name').value, provider:$('#cap-provider').value, baseUrl:$('#cap-baseurl').value, model:$('#cap-model').value, apiKey:$('#cap-apikey').value } }); toast(r.ok ? `存活 · ${r.message || '连接成功'}${r.ms ? ' · ' + r.ms + 'ms' : ''}` : `不可用 · ${r.message || '检测失败'}`, r.ok ? 'ok' : 'bad'); }
     catch(e) { toast(e.message, 'bad'); }
   };
   $('#captain-form').onsubmit = async (e) => {

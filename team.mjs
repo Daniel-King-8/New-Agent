@@ -7,6 +7,7 @@ import {
   slugify
 } from './config.mjs';
 import { maskValue } from './secrets.mjs';
+import { listModels } from './providers.mjs';
 
 export const KINDS = ['llm', 'code', 'image', 'tts', 'asr', 'video'];
 
@@ -239,9 +240,18 @@ function normalizeBaseUrl(baseUrl) {
 export async function testAgentConnection(agentInput) {
   const agent = normalizeAgent(agentInput);
   const key = decryptSecret(agent.apiKey || '') || agent.apiKey || '';
-  if (!key) throw new Error('API Key 为空');
-  if (!agent.baseUrl) throw new Error('base_url 为空');
-  if (!agent.model) throw new Error('模型为空');
+  if (agent.enabled === false) {
+    return { ok: false, kind: agent.kind, message: '员工已停用' };
+  }
+  if (!key) {
+    return { ok: false, kind: agent.kind, message: 'API Key 为空' };
+  }
+  if (!agent.baseUrl) {
+    return { ok: false, kind: agent.kind, message: 'Base URL 为空' };
+  }
+  if (!agent.model) {
+    return { ok: false, kind: agent.kind, message: '模型为空' };
+  }
 
   if (agent.kind === 'llm' || agent.kind === 'code') {
     const baseUrl = normalizeBaseUrl(agent.baseUrl);
@@ -288,11 +298,24 @@ export async function testAgentConnection(agentInput) {
   }
 
   if (agent.kind === 'image' || agent.kind === 'tts' || agent.kind === 'asr' || agent.kind === 'video') {
-    return {
-      ok: true,
-      kind: agent.kind,
-      message: `${KIND_LABELS[agent.kind]} 配置已保存。该类型暂不做在线测试，避免产生生成费用。`
-    };
+    try {
+      const result = await listModels({
+        provider: agent.provider,
+        baseUrl: agent.baseUrl,
+        apiKey: key,
+        kind: agent.kind
+      });
+      const count = result.models?.length || 0;
+      return {
+        ok: true,
+        kind: agent.kind,
+        message: count
+          ? `接口可达，可用模型 ${count} 个`
+          : (result.warning || '接口可达（未做实际生成，避免费用）')
+      };
+    } catch (error) {
+      return { ok: false, kind: agent.kind, message: error.message };
+    }
   }
 
   return { ok: true, kind: agent.kind, message: '配置已保存' };
