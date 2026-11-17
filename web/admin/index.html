@@ -368,6 +368,8 @@ tr:last-child td{border-bottom:0}
 
 <script>
 const state = { session:null, status:null, config:null, team:null, runs:[], view:'overview', editing:null, logTimer:null };
+const KIND_CN = { llm:'文本/推理', code:'编程', image:'生图', tts:'语音', asr:'语音识别', video:'视频' };
+const kindLabel = (kind) => KIND_CN[kind] ? `${kind}（${KIND_CN[kind]}）` : String(kind || '');
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -493,7 +495,7 @@ function renderTeam() {
   }
   body.innerHTML = agents.map(a => `<tr>
     <td><b>${esc(a.name)}</b><div class="note mono">${esc(a.id)}${a.department ? ' · ' + esc(a.department) : ''}</div></td>
-    <td><span class="badge blue">${esc(a.kind)}</span></td>
+    <td><span class="badge blue">${esc(kindLabel(a.kind))}</span></td>
     <td>${(a.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('') || '<span class="note">无</span>'}</td>
     <td class="mono">${esc(a.model)}<div class="note">${esc(a.provider)}</div></td>
     <td><span class="badge ${a.enabled?'ok':'warn'}">${a.enabled?'启用':'停用'}</span></td>
@@ -553,7 +555,7 @@ async function openRun(id) {
   try {
     const run = await api('/api/runs/' + encodeURIComponent(id));
     const tasks = Array.isArray(run.tasks) ? run.tasks : [];
-    const tasksHtml = tasks.length ? `<div class="section" style="padding:14px"><h3>任务拆解</h3><table><thead><tr><th>任务</th><th>类型</th><th>员工</th><th>状态</th><th>产出</th></tr></thead><tbody>${tasks.map(t=>`<tr><td>${esc(t.title || t.id)}</td><td><span class="badge blue">${esc(t.kind)}</span></td><td>${esc(t.agent || '—')}</td><td><span class="badge ${t.status==='done'?'ok':t.status==='failed'?'bad':'warn'}">${esc(t.status)}</span></td><td>${esc(String(t.text || t.error || '').slice(0, 300))}${(t.files||[]).map(f=>`<div class="note mono">${esc(f)}</div>`).join('')}</td></tr>`).join('')}</tbody></table></div>` : '';
+    const tasksHtml = tasks.length ? `<div class="section" style="padding:14px"><h3>任务拆解</h3><table><thead><tr><th>任务</th><th>类型</th><th>员工</th><th>状态</th><th>产出</th></tr></thead><tbody>${tasks.map(t=>`<tr><td>${esc(t.title || t.id)}</td><td><span class="badge blue">${esc(kindLabel(t.kind))}</span></td><td>${esc(t.agent || '—')}</td><td><span class="badge ${t.status==='done'?'ok':t.status==='failed'?'bad':'warn'}">${esc(t.status)}</span></td><td>${esc(String(t.text || t.error || '').slice(0, 300))}${(t.files||[]).map(f=>`<div class="note mono">${esc(f)}</div>`).join('')}</td></tr>`).join('')}</tbody></table></div>` : '';
     const verificationHtml = run.verification ? `<div class="section" style="padding:14px"><h3>验收</h3><pre class="pre">${esc(JSON.stringify(run.verification, null, 2))}</pre></div>` : '';
     openModal('任务详情', `<div class="two"><div class="field"><label>状态</label><input value="${esc(run.status)}" disabled></div><div class="field"><label>耗时</label><input value="${esc(fmtDuration(run.durationMs))}" disabled></div></div>
       <div class="field"><label>入口 / 用户</label><input value="${esc(run.channel)} / ${esc(run.userName || run.userId)}" disabled></div>
@@ -571,7 +573,7 @@ function openAgentModal(agent) {
   const a = agent || { name:'', kind:'image', provider:'doubao', baseUrl:'https://ark.cn-beijing.volces.com/api/v3', model:'', apiKey:'', tags:[], systemPrompt:'', enabled:true, maxConcurrency:1, timeoutMs:300000 };
   openModal(isEdit ? '编辑员工' : '新增员工', `
     <div class="two"><div class="field"><label>名称</label><input id="m-name" value="${esc(a.name)}" placeholder="豆包画师"></div>
-    <div class="field"><label>执行类型</label><select id="m-kind">${['llm','code','image','tts','asr','video'].map(k=>`<option value="${k}" ${a.kind===k?'selected':''}>${k}</option>`).join('')}</select></div></div>
+    <div class="field"><label>执行类型</label><select id="m-kind">${['llm','code','image','tts','asr','video'].map(k=>`<option value="${k}" ${a.kind===k?'selected':''}>${esc(kindLabel(k))}</option>`).join('')}</select></div></div>
     <div class="two"><div class="field"><label>Provider</label><input id="m-provider" value="${esc(a.provider)}" placeholder="doubao / openai-compatible / anthropic"></div>
     <div class="field"><label>Base URL</label><input id="m-baseurl" value="${esc(a.baseUrl)}" placeholder="https://..."></div></div>
     <div class="two"><div class="field"><label>模型</label><input id="m-model" value="${esc(a.model)}" placeholder="doubao-seedream"></div>
